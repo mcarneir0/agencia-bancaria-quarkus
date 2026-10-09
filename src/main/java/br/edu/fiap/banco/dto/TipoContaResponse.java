@@ -12,8 +12,8 @@ public record TipoContaResponse(
 ) {
     public static TipoContaResponse de(TipoConta tipoConta) {
         return new TipoContaResponse(
-                tipoConta.getId(),
-                tipoConta.getNome()
+                tipoConta.id(),
+                tipoConta.nome()
         );
     }
 }
