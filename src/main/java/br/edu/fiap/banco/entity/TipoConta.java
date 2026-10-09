@@ -13,4 +13,14 @@ public record TipoConta(Long id, String nome) {
 
         nome = nome.toUpperCase().trim();
     }
+
+    @Override
+    public Long id() {
+        return id;
+    }
+
+    @Override
+    public String nome() {
+        return nome;
+    }
 }
