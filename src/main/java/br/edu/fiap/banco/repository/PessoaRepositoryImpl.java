@@ -127,13 +127,4 @@ public class PessoaRepositoryImpl implements PessoaRepository{
             throw new IllegalStateException("Falha ao excluir pessoaa.", err);
         }
     }
-
-
-
-
-
-
-
-
-
 }
