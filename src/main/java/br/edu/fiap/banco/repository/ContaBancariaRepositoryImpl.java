@@ -5,6 +5,7 @@ import br.edu.fiap.banco.entity.Pessoa;
 import br.edu.fiap.banco.entity.TipoConta;
 import br.edu.fiap.banco.exception.ContaJaCadastradaException;
 import br.edu.fiap.banco.exception.PessoaPossuiContaException;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import javax.sql.DataSource;
@@ -14,7 +15,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
+@ApplicationScoped
 public class ContaBancariaRepositoryImpl implements ContaBancariaRepository{
 
     private static final String SELECT_BASE = """
@@ -23,7 +26,7 @@ public class ContaBancariaRepositoryImpl implements ContaBancariaRepository{
                    t.id AS tipo_id, t.nome AS tipo_nome
                 FROM contas_bancarias c
                 JOIN pessoas p ON p.id = c.titular_id
-                JOIN tipo_conta t ON t.id = c.tipo_conta_id
+                JOIN tipos_conta t ON t.id = c.tipo_conta_id
             """;
     private final DataSource dataSource;
 
@@ -65,6 +68,19 @@ public class ContaBancariaRepositoryImpl implements ContaBancariaRepository{
     }
 
     @Override
+    public Optional<ContaBancaria> buscarPorId(Long id) {
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement ps = c.prepareStatement(SELECT_BASE + " WHERE c.id = ?")) {
+            ps.setLong(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? Optional.of(mapear(rs)) : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw infraestrutura("buscar", e);
+        }
+    }
+
+    @Override
     public ContaBancaria atualizar(ContaBancaria conta) {
         String sql = "UPDATE contas_bancarias SET agencia = ?, numero = ?, tipo_conta_id = ? WHERE id = ?";
         try (Connection c = dataSource.getConnection();
@@ -95,6 +111,44 @@ public class ContaBancariaRepositoryImpl implements ContaBancariaRepository{
         }
     }
 
+
+    @Override
+    public ContaBancaria salvar(ContaBancaria conta){
+        String sql = "INSERT INTO contas_bancarias (agencia, numero, saldo, ativa, titular_id, tipo_conta_id) VALUES (?, ?, ?, ?, ? ,?)";
+
+        try (
+                Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS))
+        {
+            montarObjeto(statement, conta);
+
+            statement.executeUpdate();
+
+            try(ResultSet rs = statement.getGeneratedKeys()){
+                if(!rs.next()){
+                    throw new IllegalStateException("INSERT não devolveu id da conta");
+                }
+                return conta.comId(rs.getLong("id"));
+            }
+
+        }catch(SQLException err){
+            // SQLSTATE 23505 é uma violação de unicidade no POSTGRESQL
+            if("23505".equals(err.getSQLState())){
+                throw new ContaJaCadastradaException();
+            }
+            throw new IllegalStateException("Falha ao salvar conta(s) bancaria.", err);
+        }
+    }
+
+
+    private void montarObjeto(PreparedStatement ps, ContaBancaria conta) throws SQLException{
+        ps.setString(1, conta.agencia());
+        ps.setString(2, conta.numero());
+        ps.setBigDecimal(3, conta.saldo());
+        ps.setBoolean(4, conta.ativa());
+        ps.setLong(5, conta.titular().id());
+        ps.setLong(6, conta.tipoConta().id());
+    }
 
 
 //    Centralizar o padrão de listagem para evitar duplicação do retorno do nosso ResultSet

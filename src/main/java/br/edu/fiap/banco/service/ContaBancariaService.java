@@ -4,7 +4,9 @@ import br.edu.fiap.banco.dto.ContaBancariaRequest;
 import br.edu.fiap.banco.dto.ContaBancariaResponse;
 
 import br.edu.fiap.banco.entity.ContaBancaria;
+import br.edu.fiap.banco.entity.Pessoa;
 import br.edu.fiap.banco.entity.TipoConta;
+import br.edu.fiap.banco.exception.ContaJaCadastradaException;
 import br.edu.fiap.banco.exception.ContaNaoEncontradaException;
 import br.edu.fiap.banco.exception.PessoaNaoEncontradaException;
 import br.edu.fiap.banco.exception.TipoContaNaoEncontradoException;
@@ -45,6 +47,24 @@ public class ContaBancariaService {
             throw new PessoaNaoEncontradaException();
         }
         return contas.listarPorTitular(titularId).stream().map(ContaBancariaResponse::de).toList();
+    }
+
+    public ContaBancariaResponse criarConta(ContaBancariaRequest request){
+        if(contas.existePorAgenciaENumero(request.agencia(), request.numero())){
+            throw new ContaJaCadastradaException();
+        }
+
+        Pessoa titular = pessoas.getPessoaById(request.titularId())
+                .orElseThrow(PessoaNaoEncontradaException::new);
+
+        TipoConta tipoConta = tipos.buscarPorId(request.tipoContaId())
+                .orElseThrow(TipoContaNaoEncontradoException::new);
+
+        ContaBancaria novaConta = ContaBancaria.nova(
+                request.agencia(), request.numero(), titular, tipoConta);
+
+
+        return ContaBancariaResponse.de(contas.salvar(novaConta));
     }
 
 
